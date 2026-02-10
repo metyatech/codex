@@ -550,6 +550,15 @@ fn create_spawn_agents_on_csv_tool() -> ToolSpec {
         },
     );
     properties.insert(
+        "max_runtime_seconds".to_string(),
+        JsonSchema::Number {
+            description: Some(
+                "Maximum runtime per worker before it is failed. Defaults to 1800 seconds."
+                    .to_string(),
+            ),
+        },
+    );
+    properties.insert(
         "output_schema".to_string(),
         JsonSchema::Object {
             properties: BTreeMap::new(),

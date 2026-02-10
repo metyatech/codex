@@ -80,6 +80,7 @@ pub struct AgentJob {
     pub status: AgentJobStatus,
     pub instruction: String,
     pub auto_export: bool,
+    pub max_runtime_seconds: Option<u64>,
     pub output_schema_json: Option<Value>,
     pub input_headers: Vec<String>,
     pub input_csv_path: String,
@@ -124,6 +125,7 @@ pub struct AgentJobCreateParams {
     pub name: String,
     pub instruction: String,
     pub auto_export: bool,
+    pub max_runtime_seconds: Option<u64>,
     pub output_schema_json: Option<Value>,
     pub input_headers: Vec<String>,
     pub input_csv_path: String,
@@ -145,6 +147,7 @@ pub(crate) struct AgentJobRow {
     pub(crate) status: String,
     pub(crate) instruction: String,
     pub(crate) auto_export: i64,
+    pub(crate) max_runtime_seconds: Option<i64>,
     pub(crate) output_schema_json: Option<String>,
     pub(crate) input_headers_json: String,
     pub(crate) input_csv_path: String,
@@ -164,6 +167,7 @@ impl AgentJobRow {
             status: row.try_get("status")?,
             instruction: row.try_get("instruction")?,
             auto_export: row.try_get("auto_export")?,
+            max_runtime_seconds: row.try_get("max_runtime_seconds")?,
             output_schema_json: row.try_get("output_schema_json")?,
             input_headers_json: row.try_get("input_headers_json")?,
             input_csv_path: row.try_get("input_csv_path")?,
@@ -187,12 +191,18 @@ impl TryFrom<AgentJobRow> for AgentJob {
             .map(serde_json::from_str)
             .transpose()?;
         let input_headers = serde_json::from_str(value.input_headers_json.as_str())?;
+        let max_runtime_seconds = value
+            .max_runtime_seconds
+            .map(u64::try_from)
+            .transpose()
+            .map_err(|_| anyhow::anyhow!("invalid max_runtime_seconds value"))?;
         Ok(Self {
             id: value.id,
             name: value.name,
             status: AgentJobStatus::parse(value.status.as_str())?,
             instruction: value.instruction,
             auto_export: value.auto_export != 0,
+            max_runtime_seconds,
             output_schema_json,
             input_headers,
             input_csv_path: value.input_csv_path,

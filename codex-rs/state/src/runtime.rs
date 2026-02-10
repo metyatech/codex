@@ -747,6 +747,7 @@ INSERT INTO agent_jobs (
     status,
     instruction,
     auto_export,
+    max_runtime_seconds,
     output_schema_json,
     input_headers_json,
     input_csv_path,
@@ -764,6 +765,7 @@ INSERT INTO agent_jobs (
         .bind(AgentJobStatus::Pending.as_str())
         .bind(params.instruction.as_str())
         .bind(i64::from(params.auto_export))
+        .bind(params.max_runtime_seconds.map(i64::try_from).transpose()?)
         .bind(output_schema_json)
         .bind(input_headers_json)
         .bind(params.input_csv_path.as_str())
@@ -824,6 +826,7 @@ SELECT
     status,
     instruction,
     auto_export,
+    max_runtime_seconds,
     output_schema_json,
     input_headers_json,
     input_csv_path,

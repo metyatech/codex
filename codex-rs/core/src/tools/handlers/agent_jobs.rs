@@ -37,7 +37,7 @@ const DEFAULT_AGENT_JOB_CONCURRENCY: usize = 16;
 const MAX_AGENT_JOB_CONCURRENCY: usize = 64;
 const STATUS_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const PROGRESS_EMIT_INTERVAL: Duration = Duration::from_secs(1);
-const RUNNING_ITEM_TIMEOUT: Duration = Duration::from_secs(60 * 30);
+const DEFAULT_AGENT_JOB_ITEM_TIMEOUT: Duration = Duration::from_secs(60 * 30);
 
 #[derive(Debug, Deserialize)]
 struct SpawnAgentsOnCsvArgs {
@@ -49,6 +49,7 @@ struct SpawnAgentsOnCsvArgs {
     output_schema: Option<Value>,
     max_concurrency: Option<usize>,
     max_workers: Option<usize>,
+    max_runtime_seconds: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -310,6 +311,7 @@ mod spawn_agents_on_csv {
         let job_name = args
             .job_name
             .unwrap_or_else(|| format!("agent-job-{job_suffix}"));
+        let max_runtime_seconds = normalize_max_runtime_seconds(args.max_runtime_seconds)?;
         let _job = db
             .create_agent_job(
                 &codex_state::AgentJobCreateParams {
@@ -317,6 +319,7 @@ mod spawn_agents_on_csv {
                     name: job_name,
                     instruction: args.instruction,
                     auto_export: true,
+                    max_runtime_seconds,
                     output_schema_json: args.output_schema,
                     input_headers: headers,
                     input_csv_path: input_path.display().to_string(),
@@ -527,6 +530,18 @@ fn normalize_concurrency(requested: Option<usize>, max_threads: Option<usize>) -
     }
 }
 
+fn normalize_max_runtime_seconds(requested: Option<u64>) -> Result<Option<u64>, FunctionCallError> {
+    let Some(requested) = requested else {
+        return Ok(None);
+    };
+    if requested == 0 {
+        return Err(FunctionCallError::RespondToModel(
+            "max_runtime_seconds must be >= 1".to_string(),
+        ));
+    }
+    Ok(Some(requested))
+}
+
 async fn run_agent_job_loop(
     session: Arc<Session>,
     turn: Arc<TurnContext>,
@@ -536,18 +551,19 @@ async fn run_agent_job_loop(
 ) -> anyhow::Result<()> {
     let mut active_items: HashMap<ThreadId, ActiveJobItem> = HashMap::new();
     let mut progress_emitter = JobProgressEmitter::new();
+    let job = db
+        .get_agent_job(job_id.as_str())
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("agent job {job_id} was not found"))?;
+    let runtime_timeout = job_runtime_timeout(&job);
     recover_running_items(
         session.clone(),
         db.clone(),
         job_id.as_str(),
         &mut active_items,
+        runtime_timeout,
     )
     .await?;
-
-    let job = db
-        .get_agent_job(job_id.as_str())
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("agent job {job_id} was not found"))?;
     let initial_progress = db.get_agent_job_progress(job_id.as_str()).await?;
     progress_emitter
         .maybe_emit(&session, &turn, job_id.as_str(), &initial_progress, true)
@@ -632,6 +648,7 @@ async fn run_agent_job_loop(
             db.clone(),
             job_id.as_str(),
             &mut active_items,
+            runtime_timeout,
         )
         .await?
         {
@@ -708,14 +725,14 @@ async fn recover_running_items(
     db: Arc<codex_state::StateRuntime>,
     job_id: &str,
     active_items: &mut HashMap<ThreadId, ActiveJobItem>,
+    runtime_timeout: Duration,
 ) -> anyhow::Result<()> {
     let running_items = db
         .list_agent_job_items(job_id, Some(codex_state::AgentJobItemStatus::Running), None)
         .await?;
     for item in running_items {
-        if is_item_stale(&item) {
-            let error_message =
-                format!("worker exceeded max runtime of {:?}", RUNNING_ITEM_TIMEOUT);
+        if is_item_stale(&item, runtime_timeout) {
+            let error_message = format!("worker exceeded max runtime of {runtime_timeout:?}");
             db.mark_agent_job_item_failed(job_id, item.item_id.as_str(), error_message.as_str())
                 .await?;
             continue;
@@ -782,10 +799,11 @@ async fn reap_stale_active_items(
     db: Arc<codex_state::StateRuntime>,
     job_id: &str,
     active_items: &mut HashMap<ThreadId, ActiveJobItem>,
+    runtime_timeout: Duration,
 ) -> anyhow::Result<bool> {
     let mut stale = Vec::new();
     for (thread_id, item) in active_items.iter() {
-        if item.started_at.elapsed() >= RUNNING_ITEM_TIMEOUT {
+        if item.started_at.elapsed() >= runtime_timeout {
             stale.push((*thread_id, item.item_id.clone()));
         }
     }
@@ -793,7 +811,7 @@ async fn reap_stale_active_items(
         return Ok(false);
     }
     for (thread_id, item_id) in stale {
-        let error_message = format!("worker exceeded max runtime of {:?}", RUNNING_ITEM_TIMEOUT);
+        let error_message = format!("worker exceeded max runtime of {runtime_timeout:?}");
         db.mark_agent_job_item_failed(job_id, item_id.as_str(), error_message.as_str())
             .await?;
         let _ = session
@@ -922,6 +940,12 @@ fn ensure_unique_headers(headers: &[String]) -> Result<(), FunctionCallError> {
     Ok(())
 }
 
+fn job_runtime_timeout(job: &codex_state::AgentJob) -> Duration {
+    job.max_runtime_seconds
+        .map(Duration::from_secs)
+        .unwrap_or(DEFAULT_AGENT_JOB_ITEM_TIMEOUT)
+}
+
 fn started_at_from_item(item: &codex_state::AgentJobItem) -> Instant {
     let now = chrono::Utc::now();
     let age = now.signed_duration_since(item.updated_at);
@@ -932,10 +956,10 @@ fn started_at_from_item(item: &codex_state::AgentJobItem) -> Instant {
     }
 }
 
-fn is_item_stale(item: &codex_state::AgentJobItem) -> bool {
+fn is_item_stale(item: &codex_state::AgentJobItem, runtime_timeout: Duration) -> bool {
     let now = chrono::Utc::now();
     if let Ok(age) = now.signed_duration_since(item.updated_at).to_std() {
-        age >= RUNNING_ITEM_TIMEOUT
+        age >= runtime_timeout
     } else {
         false
     }
