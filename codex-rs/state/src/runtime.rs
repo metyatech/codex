@@ -757,7 +757,7 @@ INSERT INTO agent_jobs (
     started_at,
     completed_at,
     last_error
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL)
             "#,
         )
         .bind(params.id.as_str())
