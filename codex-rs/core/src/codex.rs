@@ -799,6 +799,7 @@ impl Session {
             model_info: &model_info,
             features: &per_turn_config.features,
             web_search_mode: per_turn_config.web_search_mode,
+            session_source: session_configuration.session_source.clone(),
         });
 
         let cwd = session_configuration.cwd.clone();
@@ -3505,6 +3506,7 @@ async fn spawn_review_thread(
         model_info: &review_model_info,
         features: &review_features,
         web_search_mode: Some(review_web_search_mode),
+        session_source: SessionSource::SubAgent(SubAgentSource::Review),
     });
 
     let review_prompt = resolved.prompt.clone();

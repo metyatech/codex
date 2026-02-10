@@ -13,6 +13,8 @@ use crate::tools::handlers::collab::MIN_WAIT_TIMEOUT_MS;
 use crate::tools::handlers::request_user_input_tool_description;
 use crate::tools::registry::ToolRegistryBuilder;
 use codex_protocol::config_types::WebSearchMode;
+use codex_protocol::protocol::SessionSource;
+use codex_protocol::protocol::SubAgentSource;
 use codex_protocol::dynamic_tools::DynamicToolSpec;
 use codex_protocol::models::VIEW_IMAGE_TOOL_NAME;
 use codex_protocol::openai_models::ApplyPatchToolType;
@@ -35,12 +37,14 @@ pub(crate) struct ToolsConfig {
     pub memory_tools: bool,
     pub request_rule_enabled: bool,
     pub experimental_supported_tools: Vec<String>,
+    pub agent_jobs_worker_tools: bool,
 }
 
 pub(crate) struct ToolsConfigParams<'a> {
     pub(crate) model_info: &'a ModelInfo,
     pub(crate) features: &'a Features,
     pub(crate) web_search_mode: Option<WebSearchMode>,
+    pub(crate) session_source: SessionSource,
 }
 
 impl ToolsConfig {
@@ -49,6 +53,7 @@ impl ToolsConfig {
             model_info,
             features,
             web_search_mode,
+            session_source,
         } = params;
         let include_apply_patch_tool = features.enabled(Feature::ApplyPatchFreeform);
         let include_collab_tools = features.enabled(Feature::Collab);
@@ -81,6 +86,12 @@ impl ToolsConfig {
             }
         };
 
+        let agent_jobs_worker_tools = matches!(
+            session_source,
+            SessionSource::SubAgent(SubAgentSource::Other(label))
+                if label.starts_with("agent_job:")
+        );
+
         Self {
             shell_type,
             apply_patch_tool_type,
@@ -90,6 +101,7 @@ impl ToolsConfig {
             memory_tools: include_memory_tools,
             request_rule_enabled,
             experimental_supported_tools: model_info.experimental_supported_tools.clone(),
+            agent_jobs_worker_tools,
         }
     }
 }
@@ -1536,9 +1548,11 @@ pub(crate) fn build_specs(
     if config.collab_tools {
         let agent_jobs_handler = Arc::new(AgentJobsHandler);
         builder.push_spec(create_spawn_agents_on_csv_tool());
-        builder.push_spec(create_report_agent_job_result_tool());
         builder.register_handler("spawn_agents_on_csv", agent_jobs_handler.clone());
-        builder.register_handler("report_agent_job_result", agent_jobs_handler);
+        if config.agent_jobs_worker_tools {
+            builder.push_spec(create_report_agent_job_result_tool());
+            builder.register_handler("report_agent_job_result", agent_jobs_handler);
+        }
     }
 
     if let Some(mcp_tools) = mcp_tools {
@@ -1725,6 +1739,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Live),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&config, None, &[]).build();
 
@@ -1789,6 +1804,35 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
+        });
+        let (tools, _) = build_specs(&tools_config, None, &[]).build();
+        assert_contains_tool_names(
+            &tools,
+            &[
+                "spawn_agent",
+                "send_input",
+                "wait",
+                "close_agent",
+                "spawn_agents_on_csv",
+            ],
+        );
+    }
+
+    #[test]
+    fn test_build_specs_agent_job_worker_tools_enabled() {
+        let config = test_config();
+        let model_info = ModelsManager::construct_model_info_offline("gpt-5-codex", &config);
+        let mut features = Features::with_defaults();
+        features.enable(Feature::Collab);
+        features.enable(Feature::CollaborationModes);
+        let tools_config = ToolsConfig::new(&ToolsConfigParams {
+            model_info: &model_info,
+            features: &features,
+            web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::SubAgent(SubAgentSource::Other(
+                "agent_job:test".to_string(),
+            )),
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
         assert_contains_tool_names(
@@ -1814,6 +1858,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
         assert!(
@@ -1826,6 +1871,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
         assert_contains_tool_names(&tools, &["request_user_input"]);
@@ -1841,6 +1887,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
         assert!(
@@ -1853,6 +1900,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
         assert_contains_tool_names(&tools, &["get_memory"]);
@@ -1870,6 +1918,7 @@ mod tests {
             model_info: &model_info,
             features,
             web_search_mode,
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, Some(HashMap::new()), &[]).build();
         let tool_names = tools.iter().map(|t| t.spec.name()).collect::<Vec<_>>();
@@ -1902,6 +1951,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
 
@@ -1924,6 +1974,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Live),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
 
@@ -2170,6 +2221,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Live),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, Some(HashMap::new()), &[]).build();
 
@@ -2192,6 +2244,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
 
@@ -2211,6 +2264,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(&tools_config, None, &[]).build();
 
@@ -2242,6 +2296,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Live),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(
             &tools_config,
@@ -2327,6 +2382,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
 
         // Intentionally construct a map with keys that would sort alphabetically.
@@ -2371,6 +2427,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
 
         let (tools, _) = build_specs(
@@ -2423,6 +2480,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
 
         let (tools, _) = build_specs(
@@ -2472,6 +2530,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
 
         let (tools, _) = build_specs(
@@ -2523,6 +2582,7 @@ mod tests {
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
 
         let (tools, _) = build_specs(
@@ -2632,6 +2692,7 @@ Examples of valid command strings:
             model_info: &model_info,
             features: &features,
             web_search_mode: Some(WebSearchMode::Cached),
+            session_source: SessionSource::Cli,
         });
         let (tools, _) = build_specs(
             &tools_config,
