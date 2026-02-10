@@ -530,6 +530,14 @@ fn create_spawn_agents_on_csv_tool() -> ToolSpec {
         },
     );
     properties.insert(
+        "max_workers".to_string(),
+        JsonSchema::Number {
+            description: Some(
+                "Alias for max_concurrency. Set to 1 to run sequentially.".to_string(),
+            ),
+        },
+    );
+    properties.insert(
         "output_schema".to_string(),
         JsonSchema::Object {
             properties: BTreeMap::new(),

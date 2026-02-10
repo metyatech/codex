@@ -48,6 +48,7 @@ struct SpawnAgentsOnCsvArgs {
     output_csv_path: Option<String>,
     output_schema: Option<Value>,
     max_concurrency: Option<usize>,
+    max_workers: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -321,8 +322,8 @@ mod spawn_agents_on_csv {
                     "failed to transition agent job {job_id} to running: {err}"
                 ))
             })?;
-        let options = build_runner_options(&session, &turn, args.max_concurrency).await?;
-        let requested_concurrency = args.max_concurrency;
+        let requested_concurrency = args.max_concurrency.or(args.max_workers);
+        let options = build_runner_options(&session, &turn, requested_concurrency).await?;
         let max_threads = turn.config.agent_max_threads;
         let effective_concurrency = options.max_concurrency;
         let message = format!(
@@ -464,8 +465,8 @@ async fn build_runner_options(
 }
 
 fn normalize_concurrency(requested: Option<usize>, max_threads: Option<usize>) -> usize {
-    let requested = requested.unwrap_or(64).max(1);
-    let requested = requested.min(64);
+    let requested = requested.unwrap_or(DEFAULT_AGENT_JOB_CONCURRENCY).max(1);
+    let requested = requested.min(MAX_AGENT_JOB_CONCURRENCY);
     if let Some(max_threads) = max_threads {
         requested.min(max_threads.max(1))
     } else {
