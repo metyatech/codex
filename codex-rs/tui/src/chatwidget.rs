@@ -2689,9 +2689,6 @@ impl ChatWidget {
         };
 
         widget.prefetch_rate_limits();
-        widget
-            .bottom_pane
-            .set_steer_enabled(widget.config.features.enabled(Feature::Steer));
         widget.bottom_pane.set_status_line_enabled(
             widget
                 .config
@@ -2856,9 +2853,6 @@ impl ChatWidget {
         };
 
         widget.prefetch_rate_limits();
-        widget
-            .bottom_pane
-            .set_steer_enabled(widget.config.features.enabled(Feature::Steer));
         widget.bottom_pane.set_status_line_enabled(
             widget
                 .config
@@ -3012,9 +3006,6 @@ impl ChatWidget {
         };
 
         widget.prefetch_rate_limits();
-        widget
-            .bottom_pane
-            .set_steer_enabled(widget.config.features.enabled(Feature::Steer));
         widget.bottom_pane.set_status_line_enabled(
             widget
                 .config
@@ -3141,7 +3132,7 @@ impl ChatWidget {
                             .take_recent_submission_mention_bindings(),
                     };
                     if self.is_session_configured() && !self.is_plan_streaming_in_tui() {
-                        // Submitted is only emitted when steer is enabled.
+                        // Submitted is emitted when user submits.
                         // Reset any reasoning header only when we are actually submitting a turn.
                         self.reasoning_buffer.clear();
                         self.full_reasoning_buffer.clear();
@@ -6023,9 +6014,6 @@ impl ChatWidget {
             self.config.features.enable(feature);
         } else {
             self.config.features.disable(feature);
-        }
-        if feature == Feature::Steer {
-            self.bottom_pane.set_steer_enabled(enabled);
         }
         if feature == Feature::CollaborationModes {
             self.bottom_pane.set_collaboration_modes_enabled(enabled);
