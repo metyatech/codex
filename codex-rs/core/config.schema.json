@@ -208,9 +208,6 @@
             "apps": {
               "type": "boolean"
             },
-            "elicitation_apps_mcp_gateway": {
-              "type": "boolean"
-            },
             "child_agents_md": {
               "type": "boolean"
             },
@@ -227,6 +224,9 @@
               "type": "boolean"
             },
             "elevated_windows_sandbox": {
+              "type": "boolean"
+            },
+            "elicitation_apps_mcp_gateway": {
               "type": "boolean"
             },
             "enable_experimental_windows_sandbox": {
@@ -1349,9 +1349,6 @@
         "apps": {
           "type": "boolean"
         },
-        "elicitation_apps_mcp_gateway": {
-          "type": "boolean"
-        },
         "child_agents_md": {
           "type": "boolean"
         },
@@ -1368,6 +1365,9 @@
           "type": "boolean"
         },
         "elevated_windows_sandbox": {
+          "type": "boolean"
+        },
+        "elicitation_apps_mcp_gateway": {
           "type": "boolean"
         },
         "enable_experimental_windows_sandbox": {
