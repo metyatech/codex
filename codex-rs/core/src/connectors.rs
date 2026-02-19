@@ -112,7 +112,7 @@ pub async fn list_accessible_connectors_from_mcp_tools_with_options(
             tx_event,
             cancel_token.clone(),
             McpInitializeOptions {
-                mcp_elicitations_enabled: config.features.enabled(Feature::ElicitationAppsGateway),
+                mcp_elicitations_enabled: config.features.enabled(Feature::AppsMcpGateway),
                 initial_sandbox_state: sandbox_state,
             },
         )

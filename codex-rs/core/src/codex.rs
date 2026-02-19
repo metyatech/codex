@@ -1417,7 +1417,7 @@ impl Session {
                 McpInitializeOptions {
                     mcp_elicitations_enabled: config
                         .features
-                        .enabled(Feature::ElicitationAppsGateway),
+                        .enabled(Feature::AppsMcpGateway),
                     initial_sandbox_state: sandbox_state,
                 },
             )
@@ -3048,7 +3048,7 @@ impl Session {
                 McpInitializeOptions {
                     mcp_elicitations_enabled: config
                         .features
-                        .enabled(Feature::ElicitationAppsGateway),
+                        .enabled(Feature::AppsMcpGateway),
                     initial_sandbox_state: sandbox_state,
                 },
             )
