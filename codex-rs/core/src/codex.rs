@@ -1415,9 +1415,7 @@ impl Session {
                 tx_event.clone(),
                 cancel_token,
                 McpInitializeOptions {
-                    mcp_elicitations_enabled: config
-                        .features
-                        .enabled(Feature::AppsMcpGateway),
+                    mcp_elicitations_enabled: config.features.enabled(Feature::AppsMcpGateway),
                     initial_sandbox_state: sandbox_state,
                 },
             )
@@ -3046,9 +3044,7 @@ impl Session {
                 self.get_tx_event(),
                 cancel_token,
                 McpInitializeOptions {
-                    mcp_elicitations_enabled: config
-                        .features
-                        .enabled(Feature::AppsMcpGateway),
+                    mcp_elicitations_enabled: config.features.enabled(Feature::AppsMcpGateway),
                     initial_sandbox_state: sandbox_state,
                 },
             )
