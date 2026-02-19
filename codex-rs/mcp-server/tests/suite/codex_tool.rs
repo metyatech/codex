@@ -56,20 +56,30 @@ async fn shell_command_approval_triggers_elicitation() -> anyhow::Result<()> {
     // observe a side-effect.
     //
     // Cross‑platform approach: run a tiny Python snippet to touch the file
-    // using `python3 -c ...` on all platforms.
+    // using `python3 -c ...` when available, otherwise fall back to `python -c ...`.
     let workdir_for_shell_function_call = TempDir::new()?;
     let created_filename = "created_by_shell_tool.txt";
     let created_file = workdir_for_shell_function_call
         .path()
         .join(created_filename);
 
+    let python_exe = if std::process::Command::new("python3")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
+        "python3"
+    } else {
+        "python"
+    };
+
     let shell_command = vec![
-        "python3".to_string(),
+        python_exe.to_string(),
         "-c".to_string(),
         format!("import pathlib; pathlib.Path('{created_filename}').touch()"),
     ];
     let expected_shell_command = format_with_current_shell(&format!(
-        "python3 -c \"import pathlib; pathlib.Path('{created_filename}').touch()\""
+        "{python_exe} -c \"import pathlib; pathlib.Path('{created_filename}').touch()\""
     ));
 
     let McpHandle {

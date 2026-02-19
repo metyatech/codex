@@ -867,6 +867,16 @@ mod tests {
             .expect("defaults for test should always succeed")
     }
 
+    fn load_skills_for_test(cfg: &Config) -> SkillLoadOutcome {
+        // `load_skills` always consults the process' real home directory to discover
+        // `$HOME/.agents/skills`. That makes these unit tests non-hermetic on developer
+        // machines that have user-installed skills. Use the test-only helper that lets us
+        // skip home-based `.agents` roots while keeping repo `.agents/skills` behavior.
+        let mut roots = skill_roots_from_layer_stack(&cfg.config_layer_stack, None);
+        roots.extend(repo_agents_skill_roots(&cfg.config_layer_stack, &cfg.cwd));
+        load_skills_from_roots(roots)
+    }
+
     fn mark_as_git_repo(dir: &Path) {
         // Config/project-root discovery only checks for the presence of `.git` (file or dir),
         // so we can avoid shelling out to `git init` in tests.
@@ -1129,7 +1139,7 @@ mod tests {
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1208,7 +1218,7 @@ interface:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1258,7 +1268,7 @@ policy:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1289,7 +1299,7 @@ policy: {}
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1332,7 +1342,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1393,7 +1403,7 @@ permissions: {}
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1449,7 +1459,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1499,7 +1509,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1543,7 +1553,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1591,7 +1601,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1638,7 +1648,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1687,7 +1697,7 @@ permissions:
         );
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1732,7 +1742,7 @@ permissions:
         symlink_dir(shared.path(), &codex_home.path().join("skills/shared"));
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1769,7 +1779,7 @@ permissions:
         symlink_file(&shared_skill_path, &skill_dir.join(SKILLS_FILENAME));
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1793,7 +1803,7 @@ permissions:
         let skill_path = write_skill_at(&cycle_dir, "demo", "cycle-skill", "still loads");
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1871,7 +1881,7 @@ permissions:
         symlink_dir(shared.path(), &repo_skills_root.join("shared"));
 
         let cfg = make_config_for_cwd(&codex_home, repo_dir.path().to_path_buf()).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -1968,7 +1978,7 @@ permissions:
         let skill_path = write_skill(&codex_home, "demo", "demo-skill", "does things\ncarefully");
         let cfg = make_config(&codex_home).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2000,7 +2010,7 @@ permissions:
         fs::write(&skill_path, contents).unwrap();
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2034,7 +2044,7 @@ permissions:
         fs::write(skill_dir.join(SKILLS_FILENAME), contents).unwrap();
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert_eq!(outcome.skills.len(), 0);
         assert_eq!(outcome.errors.len(), 1);
         assert!(
@@ -2063,7 +2073,7 @@ permissions:
         fs::write(invalid_dir.join(SKILLS_FILENAME), "---\nname: bad").unwrap();
 
         let cfg = make_config(&codex_home).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert_eq!(outcome.skills.len(), 0);
         assert_eq!(outcome.errors.len(), 1);
         assert!(
@@ -2081,7 +2091,7 @@ permissions:
         write_skill(&codex_home, "max-len", "max-len", &max_desc);
         let cfg = make_config(&codex_home).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2091,7 +2101,7 @@ permissions:
 
         let too_long_desc = "\u{1F4A1}".repeat(MAX_DESCRIPTION_LEN + 1);
         write_skill(&codex_home, "too-long", "too-long", &too_long_desc);
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert_eq!(outcome.skills.len(), 1);
         assert_eq!(outcome.errors.len(), 1);
         assert!(
@@ -2113,7 +2123,7 @@ permissions:
         let skill_path = write_skill_at(&skills_root, "repo", "repo-skill", "from repo");
         let cfg = make_config_for_cwd(&codex_home, repo_dir.path().to_path_buf()).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2149,7 +2159,7 @@ permissions:
         );
         let cfg = make_config_for_cwd(&codex_home, repo_dir.path().to_path_buf()).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2202,7 +2212,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, nested_dir).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2254,7 +2264,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, work_dir.path().to_path_buf()).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2333,7 +2343,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, repo_dir.path().to_path_buf()).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2398,7 +2408,7 @@ permissions:
         );
 
         let cfg = make_config_for_cwd(&codex_home, nested_dir).await;
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
 
         assert!(
             outcome.errors.is_empty(),
@@ -2464,7 +2474,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, repo_dir).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2493,7 +2503,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, file_path).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2534,7 +2544,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, nested_dir).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",
@@ -2552,7 +2562,7 @@ permissions:
 
         let cfg = make_config_for_cwd(&codex_home, work_dir.path().to_path_buf()).await;
 
-        let outcome = load_skills(&cfg);
+        let outcome = load_skills_for_test(&cfg);
         assert!(
             outcome.errors.is_empty(),
             "unexpected errors: {:?}",

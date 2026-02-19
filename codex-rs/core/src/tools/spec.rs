@@ -1320,6 +1320,69 @@ fn sanitize_json_schema(value: &mut JsonValue) {
                 }
             }
 
+            // Our internal JsonSchema is a limited subset and does not represent `allOf`. Some
+            // MCP tool schemas define object properties/required inside `allOf`, which would be
+            // dropped when deserializing. Merge object-y `allOf` entries into the parent schema
+            // so properties aren't lost.
+            let all_of = match map.get("allOf") {
+                Some(JsonValue::Array(all_of)) => Some(all_of.clone()),
+                _ => None,
+            };
+            if let Some(all_of) = all_of {
+                let mut required: std::collections::BTreeSet<String> =
+                    std::collections::BTreeSet::new();
+                if let Some(JsonValue::Array(req)) = map.get("required") {
+                    for r in req {
+                        if let Some(s) = r.as_str() {
+                            required.insert(s.to_string());
+                        }
+                    }
+                }
+
+                let mut changed = false;
+                for subschema in &all_of {
+                    let JsonValue::Object(sub_map) = subschema else {
+                        continue;
+                    };
+
+                    if let Some(JsonValue::Object(sub_props)) = sub_map.get("properties")
+                        && !sub_props.is_empty()
+                    {
+                        let props = map
+                            .entry("properties".to_string())
+                            .or_insert_with(|| JsonValue::Object(serde_json::Map::new()));
+                        if let JsonValue::Object(parent_props) = props {
+                            for (k, v) in sub_props {
+                                if !parent_props.contains_key(k) {
+                                    parent_props.insert(k.clone(), v.clone());
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(JsonValue::Array(sub_required)) = sub_map.get("required") {
+                        for r in sub_required {
+                            if let Some(s) = r.as_str()
+                                && required.insert(s.to_string())
+                            {
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+
+                if changed {
+                    map.insert("type".to_string(), JsonValue::String("object".to_string()));
+                    if !required.is_empty() {
+                        map.insert(
+                            "required".to_string(),
+                            JsonValue::Array(required.into_iter().map(JsonValue::String).collect()),
+                        );
+                    }
+                }
+            }
+
             // Normalize/ensure type
             let mut ty = map.get("type").and_then(|v| v.as_str()).map(str::to_string);
 
@@ -1667,6 +1730,68 @@ mod tests {
         let parameters = serde_json::to_value(openai_tool.parameters).expect("serialize schema");
 
         assert_eq!(parameters.get("properties"), Some(&serde_json::json!({})));
+    }
+
+    #[test]
+    fn parse_tool_input_schema_allof_merges_properties_into_top_level_object() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "foo": { "type": "string" }
+            },
+            "required": ["foo"],
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "model": { "type": "string" }
+                    },
+                    "required": ["model"]
+                }
+            ]
+        });
+
+        let actual = parse_tool_input_schema(&schema).expect("parse tool schema");
+        let expected = JsonSchema::Object {
+            properties: BTreeMap::from([
+                ("foo".to_string(), JsonSchema::String { description: None }),
+                (
+                    "model".to_string(),
+                    JsonSchema::String { description: None },
+                ),
+            ]),
+            required: Some(vec!["foo".to_string(), "model".to_string()]),
+            additional_properties: None,
+        };
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn parse_tool_input_schema_allof_only_object_schema_is_preserved() {
+        let schema = json!({
+            "allOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "model": { "type": "string" }
+                    },
+                    "required": ["model"]
+                }
+            ]
+        });
+
+        let actual = parse_tool_input_schema(&schema).expect("parse tool schema");
+        let expected = JsonSchema::Object {
+            properties: BTreeMap::from([(
+                "model".to_string(),
+                JsonSchema::String { description: None },
+            )]),
+            required: Some(vec!["model".to_string()]),
+            additional_properties: None,
+        };
+
+        assert_eq!(actual, expected);
     }
 
     fn tool_name(tool: &ToolSpec) -> &str {
