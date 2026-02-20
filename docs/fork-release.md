@@ -11,6 +11,8 @@ This fork ships Windows `codex self-update` binaries via GitHub Releases.
    git push metyatech fork-v0.104.1
    ```
 
+   Pre-releases use a suffix after the `X.Y.Z` version (for example `fork-v0.104.1-alpha.1`).
+
 2. GitHub Actions builds Windows binaries and publishes a GitHub Release with assets:
    - `codex-x86_64-pc-windows-msvc.exe`
    - `codex-command-runner-x86_64-pc-windows-msvc.exe`
