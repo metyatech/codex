@@ -12,6 +12,7 @@ use crate::tui::Tui;
 use crate::tui::TuiEvent;
 use crate::update_action::UpdateAction;
 use crate::updates;
+use crate::version::CODEX_CLI_VERSION;
 use codex_core::config::Config;
 use color_eyre::Result;
 use crossterm::event::KeyCode;
@@ -108,7 +109,7 @@ impl UpdatePromptScreen {
         Self {
             request_frame,
             latest_version,
-            current_version: env!("CARGO_PKG_VERSION").to_string(),
+            current_version: CODEX_CLI_VERSION.to_string(),
             update_action,
             highlighted: UpdateSelection::UpdateNow,
             selection: None,
@@ -187,18 +188,15 @@ impl WidgetRef for &UpdatePromptScreen {
         let mut column = ColumnRenderable::new();
 
         let update_command = self.update_action.command_str();
+        let current_version = &self.current_version;
+        let latest_version = &self.latest_version;
 
         column.push("");
         column.push(Line::from(vec![
             padded_emoji("  ✨").bold().cyan(),
             "Update available!".bold(),
             " ".into(),
-            format!(
-                "{current} -> {latest}",
-                current = self.current_version,
-                latest = self.latest_version
-            )
-            .dim(),
+            format!("{current_version} -> {latest_version}").dim(),
         ]));
         column.push("");
         column.push(
@@ -244,6 +242,7 @@ mod tests {
     use super::*;
     use crate::test_backend::VT100Backend;
     use crate::tui::FrameRequester;
+    use crate::version::CODEX_CLI_VERSION;
     use crossterm::event::KeyCode;
     use crossterm::event::KeyEvent;
     use crossterm::event::KeyModifiers;
@@ -264,7 +263,11 @@ mod tests {
         terminal
             .draw(|frame| frame.render_widget_ref(&screen, frame.area()))
             .expect("render update prompt");
-        insta::assert_snapshot!("update_prompt_modal", terminal.backend());
+        let sanitized = terminal
+            .backend()
+            .to_string()
+            .replace(CODEX_CLI_VERSION, "0.0.0");
+        insta::assert_snapshot!("update_prompt_modal", sanitized);
     }
 
     #[test]

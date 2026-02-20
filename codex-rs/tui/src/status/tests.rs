@@ -23,6 +23,8 @@ use ratatui::prelude::*;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+use crate::version::CODEX_CLI_VERSION;
+
 async fn test_config(temp_home: &TempDir) -> Config {
     ConfigBuilder::default()
         .codex_home(temp_home.path().to_path_buf())
@@ -82,6 +84,54 @@ fn sanitize_directory(lines: Vec<String>) -> Vec<String> {
             }
         })
         .collect()
+}
+
+fn sanitize_codex_title(lines: Vec<String>) -> Vec<String> {
+    lines
+        .into_iter()
+        .map(|line| {
+            if !line.contains("OpenAI Codex (v") {
+                return line;
+            }
+
+            let Some(first_border) = line.find('│').or_else(|| line.find('|')) else {
+                return line;
+            };
+            let Some(last_border) = line.rfind('│').or_else(|| line.rfind('|')) else {
+                return line;
+            };
+            let first_border_len = line[first_border..]
+                .chars()
+                .next()
+                .expect("find returned valid char boundary")
+                .len_utf8();
+            let prefix_end = first_border + first_border_len;
+
+            if last_border <= prefix_end {
+                return line;
+            }
+
+            let inner_width = last_border - prefix_end;
+            let mut inner = "  >_ OpenAI Codex (v0.0.0)".to_string();
+            if inner.len() < inner_width {
+                inner.push_str(&" ".repeat(inner_width - inner.len()));
+            } else if inner.len() > inner_width {
+                inner.truncate(inner_width);
+            }
+
+            let mut rebuilt = String::new();
+            rebuilt.push_str(&line[..prefix_end]);
+            rebuilt.push_str(&inner);
+            rebuilt.push_str(&line[last_border..]);
+            rebuilt
+        })
+        .collect()
+}
+
+fn sanitize_snapshot_output(lines: Vec<String>) -> String {
+    let lines = sanitize_directory(lines);
+    let lines = sanitize_codex_title(lines);
+    lines.join("\n").replace(CODEX_CLI_VERSION, "0.0.0")
 }
 
 fn reset_at_from(captured_at: &chrono::DateTime<chrono::Local>, seconds: i64) -> i64 {
@@ -167,7 +217,7 @@ async fn status_snapshot_includes_reasoning_details() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -286,7 +336,7 @@ async fn status_snapshot_includes_forked_from() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -348,7 +398,7 @@ async fn status_snapshot_includes_monthly_limit() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -650,7 +700,7 @@ async fn status_snapshot_truncates_in_narrow_terminal() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
 
     assert_snapshot!(sanitized);
 }
@@ -699,7 +749,7 @@ async fn status_snapshot_shows_missing_limits_message() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -768,7 +818,7 @@ async fn status_snapshot_includes_credits_and_limits() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -825,7 +875,7 @@ async fn status_snapshot_shows_empty_limits_message() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -891,7 +941,7 @@ async fn status_snapshot_shows_stale_limits_message() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 
@@ -961,7 +1011,7 @@ async fn status_snapshot_cached_limits_hide_credits_without_flag() {
             *line = line.replace('\\', "/");
         }
     }
-    let sanitized = sanitize_directory(rendered_lines).join("\n");
+    let sanitized = sanitize_snapshot_output(rendered_lines);
     assert_snapshot!(sanitized);
 }
 

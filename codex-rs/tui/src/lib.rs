@@ -118,6 +118,8 @@ mod wrapping;
 #[cfg(test)]
 pub mod test_backend;
 
+pub use version::CODEX_CLI_VERSION;
+
 use crate::onboarding::onboarding_screen::OnboardingScreenArgs;
 use crate::onboarding::onboarding_screen::run_onboarding_app;
 use crate::tui::Tui;
@@ -383,7 +385,12 @@ pub async fn run_main(
     }
 
     let otel = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        codex_core::otel_init::build_provider(&config, env!("CARGO_PKG_VERSION"), None, true)
+        codex_core::otel_init::build_provider(
+            &config,
+            crate::version::CODEX_CLI_VERSION,
+            None,
+            true,
+        )
     })) {
         Ok(Ok(otel)) => otel,
         Ok(Err(e)) => {
