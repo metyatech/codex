@@ -128,8 +128,13 @@ fn is_newer(latest: &str, current: &str) -> Option<bool> {
 }
 
 fn extract_version_from_latest_tag(latest_tag_name: &str) -> anyhow::Result<String> {
-    latest_tag_name
-        .strip_prefix("rust-v")
+    ["rust-v", "fork-v"]
+        .into_iter()
+        .find_map(|prefix| {
+            latest_tag_name
+                .strip_prefix(prefix)
+                .filter(|v| !v.is_empty())
+        })
         .map(str::to_owned)
         .ok_or_else(|| anyhow::anyhow!("Failed to parse latest tag name '{latest_tag_name}'"))
 }
@@ -201,6 +206,14 @@ mod tests {
     fn extracts_version_from_latest_tag() {
         assert_eq!(
             extract_version_from_latest_tag("rust-v1.5.0").expect("failed to parse version"),
+            "1.5.0"
+        );
+    }
+
+    #[test]
+    fn extracts_version_from_latest_tag_with_fork_prefix() {
+        assert_eq!(
+            extract_version_from_latest_tag("fork-v1.5.0").expect("failed to parse version"),
             "1.5.0"
         );
     }

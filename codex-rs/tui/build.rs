@@ -24,19 +24,29 @@ fn main() {
         return;
     }
 
-    if let Some(version) = highest_release_tag(&["--merged", "HEAD", "--list", "rust-v*"]) {
+    if let Some(version) =
+        highest_release_tag(&["--merged", "HEAD", "--list", "rust-v*", "fork-v*"])
+    {
         println!("cargo:rustc-env=CODEX_CLI_VERSION={version}");
         return;
     }
 
-    if let Some(version) = highest_release_tag(&["--list", "rust-v*"]) {
+    if let Some(version) = highest_release_tag(&["--list", "rust-v*", "fork-v*"]) {
         println!("cargo:rustc-env=CODEX_CLI_VERSION={version}");
     }
 }
 
 fn git_describe_version() -> Option<String> {
     let output = Command::new("git")
-        .args(["describe", "--tags", "--match", "rust-v*", "--abbrev=0"])
+        .args([
+            "describe",
+            "--tags",
+            "--match",
+            "rust-v*",
+            "--match",
+            "fork-v*",
+            "--abbrev=0",
+        ])
         .output()
         .ok()?;
 
@@ -75,7 +85,9 @@ fn highest_release_tag(args: &[&str]) -> Option<String> {
 
 fn tag_to_version(tag: &str) -> Option<String> {
     let tag = tag.trim();
-    let version = tag.strip_prefix("rust-v")?;
+    let version = tag
+        .strip_prefix("rust-v")
+        .or_else(|| tag.strip_prefix("fork-v"))?;
     if version.is_empty() {
         return None;
     }

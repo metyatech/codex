@@ -1,0 +1,52 @@
+name: fork-release-windows
+
+on:
+  push:
+    tags:
+      - "fork-v*.*.*"
+      - "fork-v*.*.*-*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-windows:
+    name: Release (Windows x86_64)
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: codex-rs
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo build (release)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          cargo build --release --bin codex --bin codex-windows-sandbox-setup --bin codex-command-runner
+
+      - name: Stage release assets
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force ..\dist | Out-Null
+          Copy-Item -Force target\release\codex.exe ..\dist\codex-x86_64-pc-windows-msvc.exe
+          Copy-Item -Force target\release\codex-command-runner.exe ..\dist\codex-command-runner-x86_64-pc-windows-msvc.exe
+          Copy-Item -Force target\release\codex-windows-sandbox-setup.exe ..\dist\codex-windows-sandbox-setup-x86_64-pc-windows-msvc.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: dist/*
