@@ -16,6 +16,7 @@ concurrency:
 jobs:
   release-windows:
     name: Release (Windows x86_64)
+    if: github.actor != 'github-actions[bot]'
     runs-on: windows-2022
     timeout-minutes: 60
     defaults:

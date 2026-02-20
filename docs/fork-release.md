@@ -4,6 +4,12 @@ This fork ships Windows `codex self-update` binaries via GitHub Releases.
 
 ## Cutting a release
 
+Releases are normally automated by the scheduled workflow in `.github/workflows/auto-sync-upstream-release.yml`,
+which watches upstream `openai/codex` stable releases and publishes a corresponding `fork-vX.Y.Z` release with
+Windows assets.
+
+Use the manual flow below only if automation is blocked (for example, an upstream merge conflict).
+
 1. Create and push an annotated tag:
 
    ```bash
