@@ -7,6 +7,10 @@ pub enum UpdateAction {
     BunGlobalLatest,
     /// Update via `brew upgrade codex`.
     BrewUpgrade,
+    /// Update by downloading the latest GitHub Release for this repo and replacing local binaries.
+    ///
+    /// This is primarily intended for unmanaged installs on Windows (for example `~/.cargo/bin/codex.exe`).
+    GitHubReleaseLatest,
 }
 
 impl UpdateAction {
@@ -16,6 +20,7 @@ impl UpdateAction {
             UpdateAction::NpmGlobalLatest => ("npm", &["install", "-g", "@openai/codex"]),
             UpdateAction::BunGlobalLatest => ("bun", &["install", "-g", "@openai/codex"]),
             UpdateAction::BrewUpgrade => ("brew", &["upgrade", "--cask", "codex"]),
+            UpdateAction::GitHubReleaseLatest => ("codex", &["self-update"]),
         }
     }
 
@@ -35,6 +40,7 @@ pub(crate) fn get_update_action() -> Option<UpdateAction> {
 
     detect_update_action(
         cfg!(target_os = "macos"),
+        cfg!(windows),
         &exe,
         managed_by_npm,
         managed_by_bun,
@@ -44,6 +50,7 @@ pub(crate) fn get_update_action() -> Option<UpdateAction> {
 #[cfg(any(not(debug_assertions), test))]
 fn detect_update_action(
     is_macos: bool,
+    is_windows: bool,
     current_exe: &std::path::Path,
     managed_by_npm: bool,
     managed_by_bun: bool,
@@ -56,6 +63,8 @@ fn detect_update_action(
         && (current_exe.starts_with("/opt/homebrew") || current_exe.starts_with("/usr/local"))
     {
         Some(UpdateAction::BrewUpgrade)
+    } else if is_windows {
+        Some(UpdateAction::GitHubReleaseLatest)
     } else {
         None
     }
@@ -68,20 +77,27 @@ mod tests {
     #[test]
     fn detects_update_action_without_env_mutation() {
         assert_eq!(
-            detect_update_action(false, std::path::Path::new("/any/path"), false, false),
+            detect_update_action(
+                false,
+                false,
+                std::path::Path::new("/any/path"),
+                false,
+                false
+            ),
             None
         );
         assert_eq!(
-            detect_update_action(false, std::path::Path::new("/any/path"), true, false),
+            detect_update_action(false, false, std::path::Path::new("/any/path"), true, false),
             Some(UpdateAction::NpmGlobalLatest)
         );
         assert_eq!(
-            detect_update_action(false, std::path::Path::new("/any/path"), false, true),
+            detect_update_action(false, false, std::path::Path::new("/any/path"), false, true),
             Some(UpdateAction::BunGlobalLatest)
         );
         assert_eq!(
             detect_update_action(
                 true,
+                false,
                 std::path::Path::new("/opt/homebrew/bin/codex"),
                 false,
                 false
@@ -91,11 +107,22 @@ mod tests {
         assert_eq!(
             detect_update_action(
                 true,
+                false,
                 std::path::Path::new("/usr/local/bin/codex"),
                 false,
                 false
             ),
             Some(UpdateAction::BrewUpgrade)
+        );
+        assert_eq!(
+            detect_update_action(
+                false,
+                true,
+                std::path::Path::new("C:\\any\\path"),
+                false,
+                false
+            ),
+            Some(UpdateAction::GitHubReleaseLatest)
         );
     }
 }

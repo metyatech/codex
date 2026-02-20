@@ -36,6 +36,8 @@ mod app_cmd;
 #[cfg(target_os = "macos")]
 mod desktop_app;
 mod mcp_cmd;
+#[cfg(windows)]
+mod self_update;
 #[cfg(not(windows))]
 mod wsl_paths;
 
@@ -143,6 +145,16 @@ enum Subcommand {
 
     /// Inspect feature flags.
     Features(FeaturesCli),
+
+    /// Internal: update the local `codex.exe` install from GitHub Releases.
+    #[cfg(windows)]
+    #[clap(hide = true, name = "self-update")]
+    SelfUpdate(self_update::SelfUpdateCommand),
+
+    /// Internal: apply self-update from a temporary updater binary.
+    #[cfg(windows)]
+    #[clap(hide = true, name = "self-update-apply")]
+    SelfUpdateApply(self_update::SelfUpdateApplyCommand),
 }
 
 #[derive(Debug, Parser)]
@@ -435,24 +447,52 @@ fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
     println!("Updating Codex via `{cmd_str}`...");
 
     let status = {
-        #[cfg(windows)]
-        {
-            // On Windows, run via cmd.exe so .CMD/.BAT are correctly resolved (PATHEXT semantics).
-            std::process::Command::new("cmd")
-                .args(["/C", &cmd_str])
-                .status()?
-        }
-        #[cfg(not(windows))]
-        {
-            let (cmd, args) = action.command_args();
-            let command_path = crate::wsl_paths::normalize_for_wsl(cmd);
-            let normalized_args: Vec<String> = args
-                .iter()
-                .map(crate::wsl_paths::normalize_for_wsl)
-                .collect();
-            std::process::Command::new(&command_path)
-                .args(&normalized_args)
-                .status()?
+        match action {
+            UpdateAction::GitHubReleaseLatest => {
+                #[cfg(windows)]
+                {
+                    let exe = std::env::current_exe()?;
+                    std::process::Command::new(exe)
+                        .arg("self-update")
+                        .arg("--parent-pid")
+                        .arg(std::process::id().to_string())
+                        .status()?
+                }
+                #[cfg(not(windows))]
+                {
+                    // Best-effort fallback (this action is currently only offered on Windows).
+                    let (cmd, args) = action.command_args();
+                    let command_path = crate::wsl_paths::normalize_for_wsl(cmd);
+                    let normalized_args: Vec<String> = args
+                        .iter()
+                        .map(crate::wsl_paths::normalize_for_wsl)
+                        .collect();
+                    std::process::Command::new(&command_path)
+                        .args(&normalized_args)
+                        .status()?
+                }
+            }
+            _ => {
+                #[cfg(windows)]
+                {
+                    // On Windows, run via cmd.exe so .CMD/.BAT are correctly resolved (PATHEXT semantics).
+                    std::process::Command::new("cmd")
+                        .args(["/C", &cmd_str])
+                        .status()?
+                }
+                #[cfg(not(windows))]
+                {
+                    let (cmd, args) = action.command_args();
+                    let command_path = crate::wsl_paths::normalize_for_wsl(cmd);
+                    let normalized_args: Vec<String> = args
+                        .iter()
+                        .map(crate::wsl_paths::normalize_for_wsl)
+                        .collect();
+                    std::process::Command::new(&command_path)
+                        .args(&normalized_args)
+                        .status()?
+                }
+            }
         }
     };
     if !status.success() {
@@ -771,6 +811,14 @@ async fn cli_main(codex_linux_sandbox_exe: Option<PathBuf>) -> anyhow::Result<()
             let socket_path = cmd.socket_path;
             tokio::task::spawn_blocking(move || codex_stdio_to_uds::run(socket_path.as_path()))
                 .await??;
+        }
+        #[cfg(windows)]
+        Some(Subcommand::SelfUpdate(cmd)) => {
+            self_update::run_self_update(cmd).await?;
+        }
+        #[cfg(windows)]
+        Some(Subcommand::SelfUpdateApply(cmd)) => {
+            self_update::run_self_update_apply(cmd).await?;
         }
         Some(Subcommand::Features(FeaturesCli { sub })) => match sub {
             FeaturesSubcommand::List => {
