@@ -4,9 +4,8 @@ use serde_json::Value;
 use std::path::Path;
 use std::path::PathBuf;
 
-const GITHUB_REPO: &str = "metyatech/openai-codex";
-const LATEST_RELEASE_API_URL: &str =
-    "https://api.github.com/repos/metyatech/openai-codex/releases/latest";
+const GITHUB_REPO: &str = "metyatech/codex";
+const LATEST_RELEASE_API_URL: &str = "https://api.github.com/repos/metyatech/codex/releases/latest";
 
 #[cfg(target_arch = "x86_64")]
 const WINDOWS_TARGET: &str = "x86_64-pc-windows-msvc";
