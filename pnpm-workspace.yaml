@@ -8,5 +8,8 @@ ignoredBuiltDependencies:
   - esbuild
 
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - minimatch
+  - glob
 
 blockExoticSubdeps: true
