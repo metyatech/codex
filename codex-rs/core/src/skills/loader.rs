@@ -891,7 +891,7 @@ mod tests {
             .expect("defaults for test should always succeed")
     }
 
-fn load_skills_for_test(config: &Config) -> SkillLoadOutcome {
+    fn load_skills_for_test(config: &Config) -> SkillLoadOutcome {
         // Keep unit tests hermetic by never scanning the real `$HOME/.agents/skills`.
         super::load_skills_with_home_dir(config, None)
     }
@@ -2661,4 +2661,3 @@ permissions:
         assert_eq!(scopes, expected);
     }
 }
-
