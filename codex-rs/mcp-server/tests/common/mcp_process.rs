@@ -131,7 +131,7 @@ impl McpProcess {
             client_info: Implementation {
                 name: "elicitation test".into(),
                 title: Some("Elicitation Test".into()),
-                version: "0.0.0".into(),
+                version: build_version.into(),
                 description: None,
                 icons: None,
                 website_url: None,
@@ -152,7 +152,7 @@ impl McpProcess {
         let build_version = env!("CARGO_PKG_VERSION");
         let originator = codex_core::default_client::originator().value;
         let user_agent = format!(
-            "{originator}/{build_version} ({} {}; {}) {} (elicitation test; 0.0.0)",
+            "{originator}/{build_version} ({} {}; {}) {} (elicitation test; {build_version})",
             os_info.os_type(),
             os_info.version(),
             os_info.architecture().unwrap_or("unknown"),
