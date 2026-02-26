@@ -120,6 +120,7 @@ jobs:
 
       - name: Open issue if merge requires manual intervention
         if: steps.compute.outputs.needs_release == 'true' && steps.merge.outputs.merge_ok == 'false'
+        continue-on-error: true
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
