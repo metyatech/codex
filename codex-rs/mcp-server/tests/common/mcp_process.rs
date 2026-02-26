@@ -112,6 +112,7 @@ impl McpProcess {
     /// Performs the initialization handshake with the MCP server.
     pub async fn initialize(&mut self) -> anyhow::Result<()> {
         let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
+        let build_version = env!("CARGO_PKG_VERSION");
 
         let params = InitializeRequestParams {
             meta: None,
@@ -149,7 +150,6 @@ impl McpProcess {
 
         let initialized = self.read_jsonrpc_message().await?;
         let os_info = os_info::get();
-        let build_version = env!("CARGO_PKG_VERSION");
         let originator = codex_core::default_client::originator().value;
         let user_agent = format!(
             "{originator}/{build_version} ({} {}; {}) {} (elicitation test; {build_version})",
