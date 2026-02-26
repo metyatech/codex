@@ -112,7 +112,8 @@ fn sanitize_codex_title(lines: Vec<String>) -> Vec<String> {
             }
 
             let inner_width = last_border - prefix_end;
-            let mut inner = "  >_ OpenAI Codex (v0.0.0)".to_string();
+            let version = env!("CARGO_PKG_VERSION");
+            let mut inner = format!("  >_ OpenAI Codex (v{version})");
             if inner.len() < inner_width {
                 inner.push_str(&" ".repeat(inner_width - inner.len()));
             } else if inner.len() > inner_width {
